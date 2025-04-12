@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Tableau CSV</title>
+  <style>
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid black; padding: 6px; text-align: left; }
+    input[type="checkbox"] { margin-right: 5px; }
+  </style>
+</head>
+<body>
+
+  <label for="csv-url">Choisir un fichier :</label>
+  <select id="csv-url">
+    <option value="https://gist.githubusercontent.com/JayPelch/0af885c8270760a9b62f83949a8f71b3/raw/31867d20d8bb5ad8c2551950d85f4fa388b453a3/test8.csv">Fichier 1</option>
+    <option value="https://raw.githubusercontent.com/uiuc-cse/data-fa14/gh-pages/data/iris.csv">Fichier 2</option>
+  </select>
+
+  <br><br>
+
+  <label for="filters">Filtres (colonne 3) :</label>
+  <div id="filters"></div>
+
+  <table id="data-table">
+    <thead><tr></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const urlSelect = document.getElementById('csv-url');
+    const table = document.getElementById('data-table');
+    const thead = table.querySelector('thead tr');
+    const tbody = table.querySelector('tbody');
+    const filterDiv = document.getElementById('filters');
+    let data = [], headers = [];
+
+    // Chargement automatique du 1er fichier au démarrage
+    window.onload = () => {
+      loadCSV(urlSelect.value);
+    };
+
+    // Changement de fichier
+    urlSelect.onchange = () => {
+      loadCSV(urlSelect.value);
+    };
+
+    async function loadCSV(url) {
+      const text = await fetch(url).then(r => r.text());
+      const lines = text.trim().split('\n');
+      headers = lines[0].split(',').map(h => h.trim());
+      data = lines.slice(1).map(l => l.split(',').map(c => c.trim()));
+      render(data);
+      createCheckboxFilters();
+    }
+
+    function render(filtered = data) {
+      thead.innerHTML = '';
+      tbody.innerHTML = '';
+      headers.forEach((h) => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        thead.appendChild(th); // plus de tri
+      });
+      filtered.forEach(row => {
+        const tr = document.createElement('tr');
+        row.forEach(cell => {
+          const td = document.createElement('td');
+          td.textContent = cell;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      mergeCells();
+    }
+
+    function createCheckboxFilters() {
+      const colIndex = 2; // colonne 3 (index 2)
+      const values = [...new Set(data.map(row => row[colIndex]))].sort();
+      filterDiv.innerHTML = '';
+      values.forEach(val => {
+        const label = document.createElement('label');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = val;
+        checkbox.onchange = applyFilters;
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(val));
+        filterDiv.appendChild(label);
+        filterDiv.appendChild(document.createElement('br'));
+      });
+    }
+
+    function applyFilters() {
+      const colIndex = 2;
+      const selectedValues = [...filterDiv.querySelectorAll('input[type="checkbox"]:checked')]
+        .map(cb => cb.value);
+
+      if (selectedValues.length === 0) {
+        render(data); // aucun filtre sélectionné
+      } else {
+        const filtered = data.filter(row => selectedValues.includes(row[colIndex]));
+        render(filtered);
+      }
+    }
+
+    function mergeCells() {
+      const rows = [...tbody.rows];
+      for (let col = 0; col < headers.length; col++) {
+        let prev = null, span = 1;
+        for (let i = 0; i < rows.length; i++) {
+          const cell = getCell(rows[i], col);
+          if (!cell) continue;
+          if (prev && cell.textContent === prev.textContent) {
+            span++;
+            prev.rowSpan = span;
+            cell.remove();
+          } else {
+            prev = cell;
+            span = 1;
+          }
+        }
+      }
+    }
+
+    function getCell(row, colIndex) {
+      let count = 0;
+      for (let cell of row.cells) {
+        if (count === colIndex) return cell;
+        count += cell.colSpan || 1;
+      }
+      return null;
+    }
+  </script>
+
+</body>
+</html>
+
